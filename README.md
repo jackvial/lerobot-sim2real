@@ -19,34 +19,45 @@ If you find this project useful, give this repo and [ManiSkill](https://github.c
 
 ## Getting Started
 
-Install this repo by running the following
+### Prerequisites
+
+- Python 3.10+
+- UV package manager: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+### Installation
+
 ```bash
-conda create -n ms3-lerobot "python==3.11" # 3.11 is recommended
+# Clone the repository
 git clone https://github.com/StoneT2000/lerobot-sim2real.git
-pip install -e .
-pip install torch # install the version of torch that works for you
+cd lerobot-sim2real
+
+# Create a virtual environment with UV
+uv venv
+
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Install the package in editable mode with UV
+uv pip install -e .
+
+# The dependencies including torch will be installed automatically via UV
+```
+
+### Quick Start
+
+Once installed, you can start training a PPO agent for the SO100 robot grasping task:
+
+```bash
+uv run python lerobot_sim2real/scripts/train_ppo_rgb.py --env-id SO100GraspCube
 ```
 
 The ManiSkill/SAPIEN simulator code is dependent on working NVIDIA drivers and vulkan packages. After running pip install above, if something is wrong with drivers/vulkan, please follow the troubleshooting guide here: https://maniskill.readthedocs.io/en/latest/user_guide/getting_started/installation.html#troubleshooting
 
-To double check if the simulator is installed correctly, you can run 
-
-```
-python -m mani_skill.examples.demo_random_action
-```
-
-Then we install lerobot which enable ease of use with all kinds of hardware.
+To double check if the simulator is installed correctly, you can run
 
 ```bash
-git clone https://github.com/huggingface/lerobot.git
-cd lerobot
-# note that the code was based on a slightly older lerobot commit. LeRobot recently changed the location of a few files we import so it broke some imports
-# latest LeRobot can work but some LeRobot import paths need to be updated
-git reset --hard a989c795587d122299275c65a38ffdd0a804b8dc
-pip install -e .
+python -m mani_skill.examples.demo_random_action
 ```
-
-Note that depending on what hardware you are using you might need to install additional packages in LeRobot. If you already installed lerobot somewhere else you can use that instead of running the command above.
 
 ## Sim2Real Tutorial
 

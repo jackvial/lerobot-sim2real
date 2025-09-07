@@ -17,3 +17,4 @@ videos/
 wandb/
 runs/
 .venv
+.claude
