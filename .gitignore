@@ -18,3 +18,4 @@ wandb/
 runs/
 .venv
 .claude
+evaluation_videos
