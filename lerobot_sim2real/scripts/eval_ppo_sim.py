@@ -3,7 +3,9 @@ Script to evaluate a trained PPO policy in the ManiSkill simulator.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 import json
+import os
 import random
 from typing import Optional
 import gymnasium as gym
@@ -37,7 +39,10 @@ class Args:
     """Random seed for reproducibility."""
     
     record_dir: Optional[str] = None
-    """Directory to save recorded videos. If None, no recordings are saved."""
+    """Directory to save recorded videos. If None, videos are saved to evaluation_videos/<timestamp>."""
+    
+    no_video: bool = False
+    """If True, disable video recording entirely."""
     
     render: bool = False
     """Whether to render the environment visually during evaluation."""
@@ -54,7 +59,7 @@ def main(args: Args):
     # Setup environment kwargs
     env_kwargs = dict(
         obs_mode="rgb+segmentation",
-        render_mode="human" if args.render else "sensors",
+        render_mode="human" if args.render else "rgb_array",  # Use rgb_array for better video recording
         max_episode_steps=args.max_episode_steps,
         reward_mode="normalized_dense"
     )
@@ -69,14 +74,25 @@ def main(args: Args):
     # Apply wrappers
     env = FlattenRGBDObservationWrapper(env, rgb=True, depth=False, state=args.include_state)
     
-    if args.record_dir is not None:
+    # Set up video recording (enabled by default unless --no-video is used)
+    if not args.no_video:
+        if args.record_dir is None:
+            # Create timestamped directory for videos
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            checkpoint_name = os.path.splitext(os.path.basename(args.checkpoint))[0]
+            args.record_dir = f"evaluation_videos/{args.env_id}_{checkpoint_name}_{timestamp}"
+        
+        # Create directory if it doesn't exist
+        os.makedirs(args.record_dir, exist_ok=True)
+        
         env = RecordEpisode(
             env, 
             output_dir=args.record_dir, 
             save_trajectory=True,
             trajectory_name="trajectory",
-            video_fps=env.unwrapped.control_freq,
-            info_on_video=True
+            video_fps=30,  # Use standard 30 fps for smoother playback
+            info_on_video=False,  # Disable text overlay
+            max_steps_per_video=args.max_episode_steps
         )
     
     # Get initial observation for agent initialization
@@ -163,8 +179,9 @@ def main(args: Args):
     print(f"Min reward: {np.min(episode_rewards):.2f}")
     print(f"Max reward: {np.max(episode_rewards):.2f}")
     
-    if args.record_dir:
+    if not args.no_video and args.record_dir:
         print(f"\nVideos saved to: {args.record_dir}")
+        print(f"You can watch the videos with: ls {args.record_dir}/*.mp4")
     
     env.close()
 

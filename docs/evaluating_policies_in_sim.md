@@ -14,7 +14,7 @@ After training a policy using `train_ppo_rgb.py`, you can evaluate its performan
 
 ### Basic Evaluation
 
-Evaluate a trained checkpoint with default settings:
+Evaluate a trained checkpoint with default settings (videos are saved automatically):
 
 ```bash
 python lerobot_sim2real/scripts/eval_ppo_sim.py \
@@ -22,6 +22,8 @@ python lerobot_sim2real/scripts/eval_ppo_sim.py \
     --env-id SO100GraspCube-v1 \
     --num-episodes 10
 ```
+
+**Note:** Videos are automatically saved to `evaluation_videos/<env_id>_<checkpoint>_<timestamp>/` unless disabled with `--no-video`.
 
 Example output:
 ```
@@ -46,18 +48,33 @@ Average episode length: 100.0 ± 0.0
 Success rate: 0.0%
 Min reward: 6.96
 Max reward: 19.00
+
+Videos saved to: evaluation_videos/SO100GraspCube-v1_ckpt_1_20250907_191529
+You can watch the videos with: ls evaluation_videos/SO100GraspCube-v1_ckpt_1_20250907_191529/*.mp4
 ```
 
-### Evaluation with Video Recording
+### Custom Video Recording Directory
 
-Record videos of the evaluation episodes:
+Specify a custom directory for videos:
 
 ```bash
 python lerobot_sim2real/scripts/eval_ppo_sim.py \
     --checkpoint runs/your_run_name/final_ckpt.pt \
     --env-id SO100GraspCube-v1 \
     --num-episodes 10 \
-    --record-dir evaluation_videos/
+    --record-dir my_custom_videos/
+```
+
+### Disable Video Recording
+
+For faster evaluation without videos:
+
+```bash
+python lerobot_sim2real/scripts/eval_ppo_sim.py \
+    --checkpoint runs/your_run_name/final_ckpt.pt \
+    --env-id SO100GraspCube-v1 \
+    --num-episodes 100 \
+    --no-video
 ```
 
 ### Evaluation with Custom Environment Configuration
@@ -117,9 +134,10 @@ This will:
 | `--num-episodes` | int | 10 | Number of episodes to evaluate |
 | `--max-episode-steps` | int | 100 | Maximum steps per episode |
 | `--seed` | int | 1 | Random seed for reproducibility |
-| `--record-dir` | str | None | Directory to save evaluation videos |
+| `--record-dir` | str | Auto-generated | Directory for videos (default: `evaluation_videos/<env>_<ckpt>_<time>`) |
+| `--no-video` | bool | False | Disable video recording |
 | `--render` | bool | False | Enable visual rendering during evaluation |
-| `--include-state` | bool | False | Include state in observations (must match training) |
+| `--include-state` | bool | True | Include state in observations (must match training) |
 
 ### PPO Built-in Evaluation Arguments
 

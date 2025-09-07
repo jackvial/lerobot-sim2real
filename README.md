@@ -17,7 +17,7 @@ If you find this project useful, give this repo and [ManiSkill](https://github.c
 }
 ```
 
-## Getting Started
+## Setup
 
 ### Prerequisites
 
@@ -43,15 +43,24 @@ uv pip install -e .
 # The dependencies including torch will be installed automatically via UV
 ```
 
-### Quick Start
+## Quick Start
 
 Once installed, you can start training a PPO agent for the SO100 robot grasping task:
 
-TODO - update to outline instructions in docs/zero_shot_rgb_sim2real.md
-TODO - Add eval in sim instructions so we can sanity check our model before running on the real robot
+### Train PPO In Sim
 
 ```bash
-uv run python lerobot_sim2real/scripts/train_ppo_rgb.py --env-id SO100GraspCube
+python lerobot_sim2real/scripts/train_ppo_rgb.py --env-id="SO100GraspCube-v1" --env-kwargs-json-path=env_config.json   --ppo.seed=${seed}   --ppo.num_envs=1024 --ppo.num-steps=16 --ppo.update_epochs=8 --ppo.num_minibatches=32   --ppo.total_timesteps=100_000_000 --ppo.gamma=0.9   --ppo.num_eval_envs=16 --ppo.num-eval-steps=64 --ppo.no-partial-reset   --ppo.exp-name="ppo-SO100GraspCube-v1-rgb-${seed}"   --ppo.track --ppo.wandb_project_name "SO100-ManiSkill"
+```
+
+To see how the model training is progress you can view the eval result videos in `runs/ppo-SO100GraspCube-v1-rgb-3/videos`
+
+### Evalulate In Sim
+
+Before runnign on real hardware you can evalate your trained PPO policy in the sim. Videos of the evals will be saved to `evaluation_videos`
+
+```bash
+python lerobot_sim2real/scripts/eval_ppo_sim.py     --checkpoint runs/ppo-SO100GraspCube-v1-rgb-3/ckpt_2826.pt     --env-id SO100GraspCube-v1     --num-episodes 10
 ```
 
 The ManiSkill/SAPIEN simulator code is dependent on working NVIDIA drivers and vulkan packages. After running pip install above, if something is wrong with drivers/vulkan, please follow the troubleshooting guide here: https://maniskill.readthedocs.io/en/latest/user_guide/getting_started/installation.html#troubleshooting
