@@ -47,6 +47,9 @@ uv pip install -e .
 
 Once installed, you can start training a PPO agent for the SO100 robot grasping task:
 
+TODO - update to outline instructions in docs/zero_shot_rgb_sim2real.md
+TODO - Add eval in sim instructions so we can sanity check our model before running on the real robot
+
 ```bash
 uv run python lerobot_sim2real/scripts/train_ppo_rgb.py --env-id SO100GraspCube
 ```
