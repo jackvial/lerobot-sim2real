@@ -16,7 +16,7 @@ from lerobot_sim2real.rl.ppo_rgb import Agent
 from lerobot_sim2real.utils.safety import setup_safe_exit
 # Use our fixed version with updated lerobot import paths
 from lerobot_sim2real.utils.lerobot_manipulator import LeRobotRealAgent
-from mani_skill.envs.sim2real_env import Sim2RealEnv
+from lerobot_sim2real.utils.sim2real_env_patch import PatchedSim2RealEnv
 from mani_skill.utils.wrappers.flatten import FlattenRGBDObservationWrapper
 from mani_skill.utils.wrappers.record import RecordEpisode
 from tqdm import tqdm
@@ -102,7 +102,7 @@ def main(args: Args):
     
     # The Sim2RealEnv class uses the sim_env to help make various checks for sim2real alignment (e.g. observation space is the same, cameras are the similar)
     # and will always try its best to apply all wrappers you used on the sim env to the real env as well.
-    real_env = Sim2RealEnv(sim_env=sim_env, agent=real_agent, control_freq=args.control_freq)
+    real_env = PatchedSim2RealEnv(sim_env=sim_env, agent=real_agent, control_freq=args.control_freq)
     # sim_env.print_sim_details()
     sim_obs, _ = sim_env.reset()
     real_obs, _ = real_env.reset()

@@ -56,13 +56,52 @@ class LeRobotRealAgent(BaseRealAgent):
         self._cached_qpos = None
         self._cached_qvel = None
 
-    def capture_sensor_data(self):
+    def capture_sensor_data(self, names: Optional[List[str]] = None):
         """
         Capture sensor data from the real robot. The captured data is stored internally and will be
         used later when `get_sensor_data` is called.
+        
+        Args:
+            names: Optional list of sensor names to capture. If None, captures all available sensors.
         """
         start = time.time()
-        self._captured_sensor_data = self.real_robot.read_cameras()
+        
+        # Get observation from robot which includes camera data
+        observation = self.real_robot.get_observation()
+        
+        # Extract camera/sensor data from the observation
+        self._captured_sensor_data = {}
+        
+        # Process camera data for each requested camera
+        if names is not None:
+            for name in names:
+                # Look for camera data in the observation
+                # The key format is usually "camera_name.image" for lerobot
+                image_key = f"{name}.image"
+                if image_key in observation:
+                    # Convert image data to the expected format
+                    # ManiSkill expects camera data as a dict with 'rgb' key
+                    image_data = observation[image_key]
+                    if isinstance(image_data, torch.Tensor):
+                        image_data = image_data.cpu().numpy()
+                    # Store as a dict with 'rgb' key for compatibility
+                    self._captured_sensor_data[name] = {"rgb": image_data}
+                elif name in observation:
+                    # Direct match
+                    data = observation[name]
+                    if isinstance(data, torch.Tensor):
+                        data = data.cpu().numpy()
+                    self._captured_sensor_data[name] = {"rgb": data}
+        else:
+            # Capture all camera data
+            for key, value in observation.items():
+                if '.image' in key:
+                    # Extract camera name from key (e.g., "base_camera.image" -> "base_camera")
+                    camera_name = key.replace('.image', '')
+                    if isinstance(value, torch.Tensor):
+                        value = value.cpu().numpy()
+                    self._captured_sensor_data[camera_name] = {"rgb": value}
+        
         self.capture_time = time.time() - start
 
     def get_sensor_data(self, names: Optional[List[str]] = None) -> dict:
@@ -71,18 +110,27 @@ class LeRobotRealAgent(BaseRealAgent):
         Args:
             names: A list of sensor names to filter the data.
         Returns:
-            A dictionary where the key is the sensor name and the value is the sensor reading as a Torch Tensor.
+            A dictionary where the key is the sensor name and the value is a dict with 'rgb' key containing the image data.
         """
         if self._captured_sensor_data is None:
             raise ValueError(
                 "Sensor data has not been captured. Please call capture_sensor_data first."
             )
-        ret = {}
+        
         if names is None:
+            # Return all captured data
             return self._captured_sensor_data
+        
+        # Return only requested sensors
+        ret = {}
         for name in names:
-            # Convert image from torch tensor (H, W, 3) to numpy array (H, W, 3).
-            ret[name] = common.to_numpy(self._captured_sensor_data[name])
+            if name in self._captured_sensor_data:
+                # Data should already be in the correct format from capture_sensor_data
+                ret[name] = self._captured_sensor_data[name]
+            else:
+                # If sensor not found, return empty dict with rgb key to avoid errors
+                print(f"Warning: Sensor '{name}' not found in captured data")
+                ret[name] = {"rgb": np.zeros((480, 640, 3), dtype=np.uint8)}  # Default empty image
         return ret
 
     def get_qpos(self, refresh=False) -> Array:
