@@ -4,7 +4,14 @@ version = "0.0.1"
 description = "Sim2Real Manipulation with LeRobot"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["lerobot==0.3.3", "mani_skill_nightly", "tensorboard", "wandb"]
+dependencies = [
+    "lerobot==0.3.3",
+    "mani_skill_nightly",
+    "tensorboard",
+    "wandb",
+    "feetech-servo-sdk",  # Required for Feetech motors used by SO100 robot
+    "pyrealsense2",  # Required for RealSense cameras
+]
 
 [project.urls]
 Homepage = "https://github.com/StoneT2000/lerobot-sim2real"

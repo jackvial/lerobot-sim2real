@@ -14,7 +14,8 @@ from lerobot_sim2real.config.real_robot import create_real_robot
 from lerobot_sim2real.rl.ppo_rgb import Agent
 
 from lerobot_sim2real.utils.safety import setup_safe_exit
-from mani_skill.agents.robots.lerobot.manipulator import LeRobotRealAgent
+# Use our fixed version with updated lerobot import paths
+from lerobot_sim2real.utils.lerobot_manipulator import LeRobotRealAgent
 from mani_skill.envs.sim2real_env import Sim2RealEnv
 from mani_skill.utils.wrappers.flatten import FlattenRGBDObservationWrapper
 from mani_skill.utils.wrappers.record import RecordEpisode

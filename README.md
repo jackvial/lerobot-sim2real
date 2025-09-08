@@ -63,6 +63,8 @@ Before runnign on real hardware you can evalate your trained PPO policy in the s
 python lerobot_sim2real/scripts/eval_ppo_sim.py     --checkpoint runs/ppo-SO100GraspCube-v1-rgb-3/ckpt_2826.pt     --env-id SO100GraspCube-v1     --num-episodes 10
 ```
 
+## Check Your Nvidia and CUDA Setup
+
 The ManiSkill/SAPIEN simulator code is dependent on working NVIDIA drivers and vulkan packages. After running pip install above, if something is wrong with drivers/vulkan, please follow the troubleshooting guide here: https://maniskill.readthedocs.io/en/latest/user_guide/getting_started/installation.html#troubleshooting
 
 To double check if the simulator is installed correctly, you can run
