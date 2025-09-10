@@ -8,9 +8,9 @@ from lerobot.cameras.realsense.configuration_realsense import RealSenseCameraCon
 from lerobot.cameras.opencv.configuration_opencv import OpenCVCameraConfig
 
 
-def create_real_robot(uid: str = "so100") -> Robot:
+def create_real_robot(uid: str = "so101") -> Robot:
     """Wrapper function to map string UIDS to real robot configurations. Primarily for saving a bit of code for users when they fork the repository. They can just edit the camera, id etc. settings in this one file."""
-    if uid == "so100":
+    if uid == "so101":
         robot_config = SO101FollowerConfig(
             port="/dev/ttyACM0",
             use_degrees=True,

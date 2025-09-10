@@ -2,7 +2,7 @@ from typing import Optional
 import gymnasium as gym
 from mani_skill.utils.wrappers.flatten import FlattenRGBDObservationWrapper
 from lerobot_sim2real.config.real_robot import create_real_robot
-from mani_skill.agents.robots.lerobot.manipulator import LeRobotRealAgent
+from lerobot_sim2real.utils.lerobot_manipulator import LeRobotRealAgent
 from mani_skill.envs.sim2real_env import Sim2RealEnv
 import cv2
 import numpy as np
@@ -20,7 +20,7 @@ class Args:
 
 
 def main(args: Args):
-    real_robot = create_real_robot(uid="so100")
+    real_robot = create_real_robot(uid="so101")
     real_robot.connect()
     # we don't need to move the robot. We only want to take a picture
     real_robot.bus.disable_torque()
