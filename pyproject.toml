@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "lerobot==0.3.3",
-    "mani_skill_nightly",
+    "mani_skill @ git+https://github.com/Viswesh-N/ManiSkill.git@main",
     "tensorboard",
     "wandb",
     "feetech-servo-sdk",  # Required for Feetech motors used by SO100 robot

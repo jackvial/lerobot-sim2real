@@ -1,7 +1,6 @@
+                
 """
-Fixed version of ManiSkill's LeRobot manipulator with updated import paths.
-Based on https://github.com/haosulab/ManiSkill/blob/main/mani_skill/agents/robots/lerobot/manipulator.py
-but with corrected import paths for newer lerobot versions.
+Code based on https://github.com/huggingface/lerobot for supporting real robot control via the unified LeRobot interface.
 """
 
 import time
@@ -15,25 +14,11 @@ from mani_skill.utils import common
 from mani_skill.utils.structs.types import Array
 
 try:
-    # Updated import paths without 'common' in them
-    from lerobot.cameras.camera import Camera
     from lerobot.motors.motors_bus import MotorNormMode
     from lerobot.robots.robot import Robot
-except ImportError as e:
-    print(f"Warning: Failed to import lerobot components: {e}")
-    # Define placeholder classes if imports fail
-    class Robot:
-        pass
-    class Camera:
-        pass
-    class MotorNormMode:
-        pass
-
-# busy_wait doesn't exist in newer lerobot versions
-# Define a simple busy wait function that just sleeps briefly
-def busy_wait(robot, duration=0.01):
-    """Simple busy wait implementation for newer lerobot versions."""
-    time.sleep(duration)
+    from lerobot.utils.robot_utils import busy_wait
+except ImportError:
+    pass
 
 
 class LeRobotRealAgent(BaseRealAgent):
@@ -48,235 +33,92 @@ class LeRobotRealAgent(BaseRealAgent):
             currently the slowest part of LeRobot for some of the supported motors.
     """
 
-    def __init__(self, robot: 'Robot', use_cached_qpos: bool = True, **kwargs):
+    def __init__(self, robot: Robot, use_cached_qpos: bool = True, **kwargs):
         super().__init__(**kwargs)
         self._captured_sensor_data = None
         self.real_robot = robot
         self.use_cached_qpos = use_cached_qpos
         self._cached_qpos = None
-        self._cached_qvel = None
+        self._motor_keys: List[str] = None
 
-    def capture_sensor_data(self, names: Optional[List[str]] = None):
-        """
-        Capture sensor data from the real robot. The captured data is stored internally and will be
-        used later when `get_sensor_data` is called.
-        
-        Args:
-            names: Optional list of sensor names to capture. If None, captures all available sensors.
-        """
-        start = time.time()
-        
-        # Get observation from robot which includes camera data
-        observation = self.real_robot.get_observation()
-        
-        # Extract camera/sensor data from the observation
-        self._captured_sensor_data = {}
-        
-        # Process camera data for each requested camera
-        if names is not None:
-            for name in names:
-                # Look for camera data in the observation
-                # The key format is usually "camera_name.image" for lerobot
-                image_key = f"{name}.image"
-                if image_key in observation:
-                    # Convert image data to the expected format
-                    # ManiSkill expects camera data as a dict with 'rgb' key
-                    image_data = observation[image_key]
-                    if isinstance(image_data, torch.Tensor):
-                        image_data = image_data.cpu().numpy()
-                    # Store as a dict with 'rgb' key for compatibility
-                    self._captured_sensor_data[name] = {"rgb": image_data}
-                elif name in observation:
-                    # Direct match
-                    data = observation[name]
-                    if isinstance(data, torch.Tensor):
-                        data = data.cpu().numpy()
-                    self._captured_sensor_data[name] = {"rgb": data}
-        else:
-            # Capture all camera data
-            for key, value in observation.items():
-                if '.image' in key:
-                    # Extract camera name from key (e.g., "base_camera.image" -> "base_camera")
-                    camera_name = key.replace('.image', '')
-                    if isinstance(value, torch.Tensor):
-                        value = value.cpu().numpy()
-                    self._captured_sensor_data[camera_name] = {"rgb": value}
-        
-        self.capture_time = time.time() - start
+        if self.real_robot.name == "so100_follower" or self.real_robot.name == "so101_follower":
+            self.real_robot.bus.motors["gripper"].norm_mode = MotorNormMode.DEGREES
 
-    def get_sensor_data(self, names: Optional[List[str]] = None) -> dict:
-        """
-        Get the captured sensor data. Use the `names` argument to filter the data by sensor names.
-        Args:
-            names: A list of sensor names to filter the data.
-        Returns:
-            A dictionary where the key is the sensor name and the value is a dict with 'rgb' key containing the image data.
-        """
-        if self._captured_sensor_data is None:
-            raise ValueError(
-                "Sensor data has not been captured. Please call capture_sensor_data first."
-            )
-        
-        if names is None:
-            # Return all captured data
-            return self._captured_sensor_data
-        
-        # Return only requested sensors
-        ret = {}
-        for name in names:
-            if name in self._captured_sensor_data:
-                # Data should already be in the correct format from capture_sensor_data
-                ret[name] = self._captured_sensor_data[name]
-            else:
-                # If sensor not found, return empty dict with rgb key to avoid errors
-                print(f"Warning: Sensor '{name}' not found in captured data")
-                ret[name] = {"rgb": np.zeros((480, 640, 3), dtype=np.uint8)}  # Default empty image
-        return ret
+    def start(self):
+        self.real_robot.connect()
 
-    def get_qpos(self, refresh=False) -> Array:
-        """
-        Get the current joint positions of the real robot.
-
-        Args:
-            refresh (bool): If True, the qpos will be read from the real robot again. Otherwise, the cached value will be returned.
-        Returns:
-            A numpy array of the current joint positions.
-        """
-        if not self.use_cached_qpos or self._cached_qpos is None or refresh:
-            # Get current joint positions from robot
-            observation = self.real_robot.get_observation()
-            
-            if hasattr(self.real_robot, 'observation_features'):
-                # For SO101 and similar robots that return observations as a dictionary
-                qpos_list = []
-                qvel_list = []
-                
-                # Extract position and velocity values from observation
-                for key, value in observation.items():
-                    if key.endswith('.pos'):
-                        qpos_list.append(value)
-                    elif key.endswith('.vel'):
-                        qvel_list.append(value)
-                
-                self._cached_qpos = np.array(qpos_list)
-                self._cached_qvel = np.array(qvel_list) if qvel_list else np.zeros_like(self._cached_qpos)
-            elif hasattr(self.real_robot, 'motor_names'):
-                # For robots with motor_names attribute
-                motor_names = self.real_robot.motor_names
-                qpos_list = []
-                qvel_list = []
-                
-                for motor_name in motor_names:
-                    pos_key = f"{motor_name}.pos"
-                    vel_key = f"{motor_name}.vel"
-                    if pos_key in observation:
-                        qpos_list.append(observation[pos_key])
-                    if vel_key in observation:
-                        qvel_list.append(observation[vel_key])
-                
-                self._cached_qpos = np.array(qpos_list)
-                self._cached_qvel = np.array(qvel_list) if qvel_list else np.zeros_like(self._cached_qpos)
-            else:
-                # Fallback for robots that return tensors
-                qpos, qvel = self.real_robot.read_motors()
-                self._cached_qpos = common.to_numpy(qpos[0])
-                self._cached_qvel = common.to_numpy(qvel[0])
-        return self._cached_qpos
-
-    def get_qvel(self, refresh=False) -> Array:
-        """
-        Get the current joint velocities of the real robot.
-
-        Args:
-            refresh (bool): If True, the qvel will be read from the real robot again. Otherwise, the cached value will be returned.
-        Returns:
-            A numpy array of the current joint velocities.
-        """
-        if not self.use_cached_qpos or self._cached_qvel is None or refresh:
-            # Use get_qpos to refresh both qpos and qvel
-            self.get_qpos(refresh=True)
-        return self._cached_qvel
+    def stop(self):
+        self.real_robot.disconnect()
 
     def set_target_qpos(self, qpos: Array):
-        """
-        Set the target joint positions for the real robot. In LeRobot, target q-positions
-        are immediately sent to the motors, but the robot will take time to reach them. You
-        can use the `busy_wait` function to block until the robot reaches the target positions.
-
-        Args:
-            qpos: A numpy array of the target joint positions.
-        """
         self._cached_qpos = None
-        self._cached_qvel = None
-        
-        # Convert qpos array to the format expected by the robot
-        # Check if robot has action_features (SO101 and similar robots)
-        if hasattr(self.real_robot, 'action_features'):
-            # Create action dictionary with joint position keys
-            action_dict = {}
-            action_features = self.real_robot.action_features
-            qpos_array = np.array(qpos).flatten()
-            
-            # Get motor names from action_features keys
-            motor_keys = [k for k in action_features.keys() if k.endswith('.pos')]
-            
-            for i, motor_key in enumerate(motor_keys):
-                if i < len(qpos_array):
-                    action_dict[motor_key] = qpos_array[i]
-            
-            # Send the action dictionary to the robot
-            self.real_robot.send_action(action_dict)
-        elif hasattr(self.real_robot, 'motor_names'):
-            # For robots with motor_names attribute
-            action_dict = {}
-            motor_names = self.real_robot.motor_names
-            qpos_array = np.array(qpos).flatten()
-            
-            for i, motor_name in enumerate(motor_names):
-                if i < len(qpos_array):
-                    action_dict[f"{motor_name}.pos"] = qpos_array[i]
-            
-            # Send the action dictionary to the robot
-            self.real_robot.send_action(action_dict)
+        qpos = common.to_cpu_tensor(qpos).flatten()
+        qpos = torch.rad2deg(qpos)
+        qpos = {f"{self._motor_keys[i]}.pos": qpos[i] for i in range(len(qpos))}
+        # NOTE (stao): It seems the calibration from LeRobot has some offsets in some joints. We fix reading them here to match the expected behavior
+        if self.real_robot.name == "so100_follower":
+            qpos["elbow_flex.pos"] = qpos["elbow_flex.pos"] + 6.8
+        self.real_robot.send_action(qpos)
+
+    def reset(self, qpos: Array):
+        qpos = common.to_cpu_tensor(qpos)
+        freq = 30
+        target_pos = self.qpos
+        max_rad_per_step = 0.025
+        for _ in range(int(20 * freq)):
+            start_loop_t = time.perf_counter()
+            delta_step = (qpos - target_pos).clip(
+                min=-max_rad_per_step, max=max_rad_per_step
+            )
+            if np.linalg.norm(delta_step) <= 1e-4:
+                break
+            target_pos += delta_step
+
+            self.set_target_qpos(target_pos)
+            dt_s = time.perf_counter() - start_loop_t
+            busy_wait(1 / freq - dt_s)
+
+    def capture_sensor_data(self, sensor_names: Optional[List[str]] = None):
+        sensor_obs = dict()
+        cameras: dict[str, Camera] = self.real_robot.cameras
+        if sensor_names is None:
+            sensor_names = list(cameras.keys())
+        for name in sensor_names:
+            data = cameras[name].async_read()
+            # until https://github.com/huggingface/lerobot/issues/860 is resolved we temporarily assume this is RGB data only otherwise need to write a few extra if statements to check
+            # if isinstance(cameras[name], IntelRealSenseCamera):
+            sensor_obs[name] = dict(rgb=(common.to_tensor(data)).unsqueeze(0))
+        self._captured_sensor_data = sensor_obs
+
+    def get_sensor_data(self, sensor_names: Optional[List[str]] = None):
+        if self._captured_sensor_data is None:
+            raise RuntimeError(
+                "No sensor data captured yet. Please call capture_sensor_data() first."
+            )
+        if sensor_names is None:
+            return self._captured_sensor_data
         else:
-            # Fallback to tensor format (for other robot types)
-            qpos_tensor = torch.from_numpy(np.array(qpos)).float().unsqueeze(0)
-            self.real_robot.send_action(qpos_tensor)
-        
-        busy_wait(self.real_robot)
+            return {
+                k: v for k, v in self._captured_sensor_data.items() if k in sensor_names
+            }
 
-    def set_target_qvel(self, qvel: Array):
-        """
-        Set the target joint velocities for the real robot. Note that not all LeRobot robots
-        support velocity control.
+    def get_qpos(self):
+        # NOTE (stao): the slowest part of inference is reading the qpos from the robot. Each time it takes about 5-6 milliseconds, meaning control frequency is capped at 200Hz.
+        # and if you factor in other operations like policy inference etc. the max control frequency is typically more like 30-60 Hz.
+        # Moreover on the rare occassions reading qpos can take 40 milliseconds which causes the control step to fall behind the desired control frequency.
+        if self.use_cached_qpos and self._cached_qpos is not None:
+            return self._cached_qpos.clone()
+        qpos_deg = self.real_robot.bus.sync_read("Present_Position")
 
-        Args:
-            qvel: A numpy array of the target joint velocities.
-        """
-        raise NotImplementedError(
-            "LeRobot does not currently provide a velocity control interface."
-        )
+        # NOTE (stao): It seems the calibration from LeRobot has some offsets in some joints. We fix reading them here to match the expected behavior
+        if self.real_robot.name == "so100_follower":
+            qpos_deg["elbow_flex"] = qpos_deg["elbow_flex"] - 6.8
+        if self._motor_keys is None:
+            self._motor_keys = list(qpos_deg.keys())
+        qpos_deg = common.flatten_state_dict(qpos_deg)
+        qpos = torch.deg2rad(torch.tensor(qpos_deg)).unsqueeze(0)
+        self._cached_qpos = qpos
+        return qpos
 
-    def release(self):
-        """
-        Release the real robot. This function currently does nothing in LeRobot.
-        """
-        pass
-    
-    def reset(self, qpos: Array = None):
-        """
-        Reset the real robot to a given joint position or home position.
-        
-        Args:
-            qpos: Target joint positions to reset to. If None, resets to home position.
-        """
-        if qpos is not None:
-            # Move robot to the specified position
-            self.set_target_qpos(qpos)
-        else:
-            # If no position specified, we could move to a default home position
-            # For now, just stay at current position
-            pass
-        
-        # Clear cached sensor data
-        self._captured_sensor_data = None
+    def get_qvel(self):
+        raise NotImplementedError

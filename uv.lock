@@ -1443,7 +1443,7 @@ source = { editable = "." }
 dependencies = [
     { name = "feetech-servo-sdk" },
     { name = "lerobot" },
-    { name = "mani-skill-nightly" },
+    { name = "mani-skill" },
     { name = "pyrealsense2" },
     { name = "tensorboard" },
     { name = "wandb" },
@@ -1453,7 +1453,7 @@ dependencies = [
 requires-dist = [
     { name = "feetech-servo-sdk" },
     { name = "lerobot", specifier = "==0.3.3" },
-    { name = "mani-skill-nightly" },
+    { name = "mani-skill", git = "https://github.com/Viswesh-N/ManiSkill.git?rev=main" },
     { name = "pyrealsense2" },
     { name = "tensorboard" },
     { name = "wandb" },
@@ -1562,9 +1562,9 @@ wheels = [
 ]
 
 [[package]]
-name = "mani-skill-nightly"
-version = "2025.9.5.2334"
-source = { registry = "https://pypi.org/simple" }
+name = "mani-skill"
+version = "3.0.0b21"
+source = { git = "https://github.com/Viswesh-N/ManiSkill.git?rev=main#bd18832d9d35bb011acb65f5c37b237f1aa21d74" }
 dependencies = [
     { name = "dacite" },
     { name = "fast-kinematics", marker = "sys_platform == 'linux'" },
@@ -1588,9 +1588,6 @@ dependencies = [
     { name = "transforms3d" },
     { name = "trimesh" },
     { name = "tyro" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/6c/779a2bb84d79c1122abe77a70dd8621258faf81bf930004a035ea210ec55/mani_skill_nightly-2025.9.5.2334-py3-none-any.whl", hash = "sha256:8c4d5bfbf781c871cec3de8b603dcc1bbdb08ef6c181d65f0bd27d2f74b42850", size = 101697500, upload-time = "2025-09-05T23:35:21.024Z" },
 ]
 
 [[package]]
