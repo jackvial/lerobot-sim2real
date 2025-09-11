@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Alignment Tool</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Camera Alignment Tool</h1>
+            <div class="status-bar">
+                <span class="status-indicator" id="connectionStatus">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Disconnected</span>
+                </span>
+                <span class="frame-counter">Frame: <span id="frameCount">0</span></span>
+            </div>
+        </header>
+
+        <main>
+            <div class="content-wrapper">
+                <div class="camera-view">
+                    <canvas id="cameraCanvas"></canvas>
+                    <div class="loading-overlay" id="loadingOverlay">
+                        <div class="spinner"></div>
+                        <p>Connecting to camera...</p>
+                    </div>
+                </div>
+
+                <aside class="controls-panel">
+                    <section class="control-section">
+                        <h2>Camera Position</h2>
+                        <div class="position-display">
+                            <div class="position-item">
+                                <label>X:</label>
+                                <span id="posX">0.000</span>
+                            </div>
+                            <div class="position-item">
+                                <label>Y:</label>
+                                <span id="posY">0.000</span>
+                            </div>
+                            <div class="position-item">
+                                <label>Z:</label>
+                                <span id="posZ">0.000</span>
+                            </div>
+                            <div class="position-item">
+                                <label>FOV:</label>
+                                <span id="fov">0.000</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="control-section">
+                        <h2>Movement Controls</h2>
+                        <div class="movement-controls">
+                            <div class="control-grid">
+                                <button class="control-btn" data-control="forward" title="Move Forward (W)">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/>
+                                    </svg>
+                                </button>
+                                <button class="control-btn" data-control="left" title="Move Left (A)">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                                    </svg>
+                                </button>
+                                <button class="control-btn" data-control="backward" title="Move Backward (S)">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/>
+                                    </svg>
+                                </button>
+                                <button class="control-btn" data-control="right" title="Move Right (D)">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="vertical-controls">
+                                <button class="control-btn" data-control="up" title="Move Up (U)">
+                                    ↑ Up
+                                </button>
+                                <button class="control-btn" data-control="down" title="Move Down (J)">
+                                    ↓ Down
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="control-section">
+                        <h2>Field of View</h2>
+                        <div class="fov-controls">
+                            <button class="control-btn" data-control="fov_decrease" title="Decrease FOV (,)">
+                                − Decrease
+                            </button>
+                            <button class="control-btn" data-control="fov_increase" title="Increase FOV (.)">
+                                + Increase
+                            </button>
+                        </div>
+                    </section>
+
+                    <section class="control-section">
+                        <h2>Actions</h2>
+                        <div class="action-buttons">
+                            <button class="action-btn primary" id="saveConfigBtn">
+                                Save Configuration
+                            </button>
+                            <button class="action-btn secondary" data-control="reset">
+                                Reset Camera
+                            </button>
+                        </div>
+                    </section>
+
+                    <section class="control-section">
+                        <h2>Keyboard Shortcuts</h2>
+                        <div class="shortcuts">
+                            <div class="shortcut-item">
+                                <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> - Move camera
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>U</kbd><kbd>J</kbd> - Up/Down
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>,</kbd><kbd>.</kbd> - Adjust FOV
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>P</kbd> - Save config
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>Backspace</kbd> - Reset
+                            </div>
+                        </div>
+                    </section>
+                </aside>
+            </div>
+        </main>
+
+        <div class="notification" id="notification">
+            <span class="notification-text"></span>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

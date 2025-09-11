@@ -1,5 +1,4 @@
 import json
-import time
 from typing import Optional
 import gymnasium as gym
 import torch
@@ -14,7 +13,13 @@ import tyro
 from mani_skill.utils.visualization.misc import tile_images
 from mani_skill.utils import sapien_utils
 from dataclasses import dataclass
-import matplotlib.pyplot as plt
+import os
+import threading
+import sys
+import select
+import termios
+import tty
+import time
 
 @dataclass
 class Args:
@@ -22,6 +27,8 @@ class Args:
     """The environment id to train on"""
     env_kwargs_json_path: Optional[str] = None
     """Path to a json file containing additional environment kwargs to use."""
+    camera_config_path: Optional[str] = "camera_alignment_config.json"
+    """Path to save/load camera alignment configuration"""
 
 def overlay_envs(sim_env, real_env):
     """
@@ -46,35 +53,37 @@ def overlay_envs(sim_env, real_env):
 
 
 def update_camera(sim_env):
-    global camera_offset, fov_offset, last_frame_time, help_message_printed
-    current_time = time.time()
-    delta_time = current_time - last_frame_time
-    last_frame_time = current_time
+    global camera_offset, fov_offset
+    
+    # Fixed step size for single key presses
+    MOVEMENT_STEP = 0.01  # units per key press
+    FOV_STEP = 0.01  # radians per key press
 
     # Reset camera position and FOV on backspace
     if "backspace" in active_keys:
         camera_offset = torch.zeros(3, dtype=torch.float32)
         fov_offset = 0.0
+        print("Camera reset to initial position")
 
     # Camera movement mapping based on active keys
     if "w" in active_keys:
-        camera_offset[0] -= MOVEMENT_SPEED * delta_time  # Move forward
+        camera_offset[0] -= MOVEMENT_STEP  # Move forward
     if "s" in active_keys:
-        camera_offset[0] += MOVEMENT_SPEED * delta_time  # Move back
+        camera_offset[0] += MOVEMENT_STEP  # Move back
     if "d" in active_keys:
-        camera_offset[1] += MOVEMENT_SPEED * delta_time  # Move right
+        camera_offset[1] += MOVEMENT_STEP  # Move right
     if "a" in active_keys:
-        camera_offset[1] -= MOVEMENT_SPEED * delta_time  # Move left
+        camera_offset[1] -= MOVEMENT_STEP  # Move left
     if "up" in active_keys:
-        camera_offset[2] += MOVEMENT_SPEED * delta_time  # Move up
+        camera_offset[2] += MOVEMENT_STEP  # Move up
     if "down" in active_keys:
-        camera_offset[2] -= MOVEMENT_SPEED * delta_time  # Move down
+        camera_offset[2] -= MOVEMENT_STEP  # Move down
 
     # FOV control
     if "left" in active_keys:
-        fov_offset -= FOV_CHANGE_SPEED * delta_time
+        fov_offset -= FOV_STEP
     if "right" in active_keys:
-        fov_offset += FOV_CHANGE_SPEED * delta_time
+        fov_offset += FOV_STEP
 
     # update camera position and fov
     pos = sim_env.unwrapped.base_camera_settings["pos"] + camera_offset
@@ -84,43 +93,96 @@ def update_camera(sim_env):
         sim_env.unwrapped.base_camera_settings["fov"] + fov_offset
     )
 
-    if len(active_keys) > 0:
-        print("current_camera_position", pose.p)
-        print(
-            "current_camera_fov",
-            sim_env.unwrapped.base_camera_settings["fov"] + fov_offset,
-        )
-        help_message_printed = False  # Reset the flag when there's movement
-    elif (
-        not help_message_printed
-    ):  # Only print help message if it hasn't been printed yet
-        print("=== Commands for controlling sim camera ===")
-        print(
-            "press: (w), (a) to move in x, (s), (d) to move in y, (up), (down) to move in z, (left), (right) to change fov of simulation camera"
-        )
-        print("press: (backspace) to reset, close figure to exit")
-        print()
-        help_message_printed = True
+    if len(active_keys) > 0 and "backspace" not in active_keys:
+        print(f"Camera position: {pose.p}, FOV: {sim_env.unwrapped.base_camera_settings['fov'] + fov_offset:.3f}")
 
 camera_offset = torch.zeros(3, dtype=torch.float32)
 fov_offset = 0.0
 active_keys = set()
-last_frame_time = time.time()
-MOVEMENT_SPEED = 0.1  # units per second
-FOV_CHANGE_SPEED = 0.1  # radians per second
-help_message_printed = False  # Flag to track if we've printed the help message
+running = True
 
+def save_camera_config(config_path, camera_offset, fov_offset):
+    """Save camera configuration to JSON file"""
+    config = {
+        "camera_offset": camera_offset.tolist(),
+        "fov_offset": float(fov_offset),
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    with open(config_path, 'w') as f:
+        json.dump(config, f, indent=2)
+    print(f"\nCamera configuration saved to: {config_path}")
+    print(f"  Position offset: {camera_offset.tolist()}")
+    print(f"  FOV offset: {fov_offset:.3f}")
 
-def on_key_press(event):
-    global active_keys
-    active_keys.add(event.key)
+def load_camera_config(config_path):
+    """Load camera configuration from JSON file"""
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        camera_offset = torch.tensor(config["camera_offset"], dtype=torch.float32)
+        fov_offset = config["fov_offset"]
+        print(f"\nLoaded camera configuration from: {config_path}")
+        print(f"  Position offset: {camera_offset.tolist()}")
+        print(f"  FOV offset: {fov_offset:.3f}")
+        print(f"  Saved at: {config.get('timestamp', 'unknown')}")
+        return camera_offset, fov_offset
+    else:
+        print(f"\nNo saved configuration found at: {config_path}")
+        print("Starting with default camera position")
+        return torch.zeros(3, dtype=torch.float32), 0.0
 
+def get_single_char():
+    """Get a single character from terminal input"""
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        ch = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return ch
 
-def on_key_release(event):
-    global active_keys
-    active_keys.discard(event.key)
+def keyboard_listener(config_path=None):
+    """Background thread to listen for keyboard input"""
+    global running, active_keys, camera_offset, fov_offset
+    while running:
+        if select.select([sys.stdin], [], [], 0.1)[0]:
+            ch = get_single_char()
+            active_keys.clear()
+            
+            if ch == '\x1b':  # ESC key
+                running = False
+                print("\nExiting camera alignment...")
+            elif ch == 'w':
+                active_keys.add('w')
+            elif ch == 's':
+                active_keys.add('s')
+            elif ch == 'a':
+                active_keys.add('a')
+            elif ch == 'd':
+                active_keys.add('d')
+            elif ch == 'u':  # 'u' for up
+                active_keys.add('up')
+            elif ch == 'j':  # 'j' for down (like vim)
+                active_keys.add('down')
+            elif ch == ',':
+                active_keys.add('left')
+            elif ch == '.':
+                active_keys.add('right')
+            elif ch == '\x7f' or ch == '\x08':  # Backspace
+                active_keys.add('backspace')
+            elif ch == 'p' and config_path:  # 'p' to save (persist)
+                save_camera_config(config_path, camera_offset, fov_offset)
+            elif ch == 'q':  # Alternative quit key
+                running = False
+                print("\nExiting camera alignment...")
 
 def main(args: Args):
+    global running, camera_offset, fov_offset
+    
+    # Load saved camera configuration if it exists
+    camera_offset, fov_offset = load_camera_config(args.camera_config_path)
+    
     real_robot = create_real_robot(uid="so101")
     real_robot.connect()
     real_agent = LeRobotRealAgent(real_robot)
@@ -144,35 +206,75 @@ def main(args: Args):
     # safety setup, now ctrl+c will first reset the robot to a resting position and then close environments and turn of torque
     setup_safe_exit(sim_env, real_env, real_agent)
 
-    real_obs, _ = real_env.reset()
+    real_env.reset()
 
-    # for plotting robot camera reads
-    fig = plt.figure()
-    ax = fig.add_subplot()
-
-    # Disable all default key bindings
-    fig.canvas.mpl_disconnect(fig.canvas.manager.key_press_handler_id)
-    fig.canvas.manager.key_press_handler_id = None
-
-    # initialize the plot
-    im = ax.imshow(overlay_envs(sim_env, real_env))
-
-    fig.canvas.mpl_connect("key_press_event", on_key_press)
-    fig.canvas.mpl_connect("key_release_event", on_key_release)
-
-    print("Camera alignment: Move real camera to align with the sim camera, close figure to exit")
-    while True:
+    # Create output directory for alignment images
+    output_dir = "camera_alignment_output"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print("\n" + "="*60)
+    print("CAMERA ALIGNMENT TOOL")
+    print("="*60)
+    print("\nSaving alignment images to:", os.path.abspath(output_dir))
+    print("Camera config file:", os.path.abspath(args.camera_config_path))
+    print("\n=== Keyboard Controls (Terminal Mode) ===")
+    print("  Movement:")
+    print("    w/s     - Move forward/backward (X axis)")
+    print("    a/d     - Move left/right (Y axis)")
+    print("    u/j     - Move up/down (Z axis)")
+    print("  Camera:")
+    print("    ,/.     - Decrease/Increase FOV")
+    print("  Other:")
+    print("    p         - Save (persist) current camera position")
+    print("    backspace - Reset camera to initial position")
+    print("    q or ESC  - Exit")
+    print("\nImages are continuously saved to disk.")
+    print("Open another terminal and use an image viewer to monitor:")
+    print(f"  watch -n 0.5 'ls -la {output_dir}/'")
+    print(f"  Or: feh --reload 0.5 {output_dir}/camera_alignment.jpg")
+    print("="*60 + "\n")
+    
+    # Start keyboard listener thread with config path
+    keyboard_thread = threading.Thread(target=keyboard_listener, args=(args.camera_config_path,), daemon=True)
+    keyboard_thread.start()
+    
+    frame_count = 0
+    while running:
         overlaid_imgs = overlay_envs(sim_env, real_env)
-        im.set_data(overlaid_imgs)
+        
+        # Convert tensor to numpy array if needed
+        if isinstance(overlaid_imgs, torch.Tensor):
+            overlaid_imgs = overlaid_imgs.cpu().numpy()
+        
+        # Convert to BGR for OpenCV saving (assuming RGB input)
+        if overlaid_imgs.dtype != np.uint8:
+            overlaid_imgs = (overlaid_imgs * 255).astype(np.uint8)
+        overlaid_imgs_bgr = cv2.cvtColor(overlaid_imgs, cv2.COLOR_RGB2BGR)
+        
+        # Save the current frame
+        output_path = os.path.join(output_dir, "camera_alignment.jpg")
+        cv2.imwrite(output_path, overlaid_imgs_bgr)
+        
+        # Also save numbered frames periodically (every 10th frame)
+        if frame_count % 10 == 0:
+            numbered_path = os.path.join(output_dir, f"frame_{frame_count:06d}.jpg")
+            cv2.imwrite(numbered_path, overlaid_imgs_bgr)
+        
         # Update camera position based on active keys
         update_camera(sim_env)
-        # Redraw the plot
-        fig.canvas.draw()
-        fig.show()
-        fig.canvas.flush_events()
-        if not plt.fignum_exists(fig.number):
-            print("The figure has been closed.")
-            break
+        
+        frame_count += 1
+        
+        # Small delay to prevent excessive CPU usage
+        time.sleep(0.05)  # 20 FPS
+    
+    # Save final camera configuration
+    if args.camera_config_path:
+        save_camera_config(args.camera_config_path, camera_offset, fov_offset)
+    
+    print("\nCamera alignment completed.")
+    print(f"Final images saved in: {os.path.abspath(output_dir)}")
+    print(f"Camera configuration saved to: {os.path.abspath(args.camera_config_path)}")
 
 if __name__ == "__main__":
     args = tyro.cli(Args)
