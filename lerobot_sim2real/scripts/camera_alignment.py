@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 
 @dataclass
 class Args:
-    env_id: str = "SO100GraspCube-v1"
+    env_id: str = "SO101GraspCube-v1"
     """The environment id to train on"""
     env_kwargs_json_path: Optional[str] = None
     """Path to a json file containing additional environment kwargs to use."""
@@ -121,7 +121,7 @@ def on_key_release(event):
     active_keys.discard(event.key)
 
 def main(args: Args):
-    real_robot = create_real_robot(uid="so100")
+    real_robot = create_real_robot(uid="so101")
     real_robot.connect()
     real_agent = LeRobotRealAgent(real_robot)
 
