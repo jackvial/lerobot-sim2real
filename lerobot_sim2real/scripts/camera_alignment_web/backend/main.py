@@ -306,7 +306,15 @@ server = CameraAlignmentServer()
 @app.on_event("startup")
 async def startup():
     """Initialize server on startup"""
-    server.initialize()
+    # Check if env_config.json exists in the project root
+    import os
+    from pathlib import Path
+    env_config_path = Path(__file__).parent.parent.parent.parent.parent / "env_config.json"
+    if env_config_path.exists():
+        print(f"Loading environment config from {env_config_path}")
+        server.initialize(env_kwargs_json_path=str(env_config_path))
+    else:
+        server.initialize()
 
 @app.on_event("shutdown")
 async def shutdown():
