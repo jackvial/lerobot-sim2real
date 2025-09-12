@@ -23,9 +23,9 @@ First you should update the `lerobot_sim2real/config/real_robot.py` file to matc
 
 ## 1: Setup your simulation and real world environment
 
-We provide a pre-built [simulation environment called SO100GraspCube-v1](https://github.com/haosulab/ManiSkill/tree/main/mani_skill/envs/tasks/digital_twins/so100_arm/grasp_cube.py) that only needs a few minor modifications for your own use. If you are interested in making your own environments to then tackle via sim2real reinforcement learning we recommend you finish this tutorial first, then learn how to [create custom simulated tasks in ManiSkill](https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/index.html), then follow the tutorial on how to [design them for sim2real support](https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/sim2real/index.html)
+We provide a pre-built [simulation environment called SO101GraspCube-v1](https://github.com/haosulab/ManiSkill/tree/main/mani_skill/envs/tasks/digital_twins/so100_arm/grasp_cube.py) that only needs a few minor modifications for your own use. If you are interested in making your own environments to then tackle via sim2real reinforcement learning we recommend you finish this tutorial first, then learn how to [create custom simulated tasks in ManiSkill](https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/index.html), then follow the tutorial on how to [design them for sim2real support](https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/sim2real/index.html)
 
-In this section we need to roughly align the real world and simulation environments. This means we need to decide where the robot is installed, and where the camera is relative to the robot. 
+In this section we need to roughly align the real world and simulation environments. This means we need to decide where the robot is installed, and where the camera is relative to the robot.
 
 ## 1.1: Setup simulation camera and object spawn region
 
@@ -36,7 +36,7 @@ First thing to do is to decide in simulation where to put the 3rd-view camera re
 To make modifications you can just edit the "base_camera_settings"."pos" value in the `env_config.json` file in the root of the repository. We use this config file to modify environment defaults when training (you can pass in a different file path if you want). To visualize what you just did you can record a video of your environment being reset randomly to get a sense of where the camera is and see how the object positions are randomized.
 
 ```bash
-python lerobot_sim2real/scripts/record_reset_distribution.py --env-id="SO100GraspCube-v1" --env-kwargs-json-path=env_config.json
+python lerobot_sim2real/scripts/record_reset_distribution.py --env-id="SO101GraspCube-v1" --env-kwargs-json-path=env_config.json
 ```
 
 https://github.com/user-attachments/assets/905c2c5c-6cf4-43a9-8cb8-fa40748fffef
@@ -48,8 +48,7 @@ The default options for the sim settings are tested and should work so you can a
 > [!NOTE]
 > Occlusion can make grasping a cube harder. If you plan to modify the sim environment make sure the cube is always visible, close to the camera, and generally not behind the robot from the camera's perspective. If it isn't, you can modify the camera accordingly or also modify the spawn region for the cube in the env_config.json file. Moreover larger spawn region areas will take longer to learn to solve in simulation.
 
-
-You might also notice that we often use `--env-id="SO100GraspCube-v1" --env-kwargs-json-path=env_config.json` in scripts. The codebase is built to support different environments and configurations so passing these tells those scripts which environment you want to work with and with what settings.
+You might also notice that we often use `--env-id="SO101GraspCube-v1" --env-kwargs-json-path=env_config.json` in scripts. The codebase is built to support different environments and configurations so passing these tells those scripts which environment you want to work with and with what settings.
 
 Before we start setting up the real camera you might also want to check if your robot's colors match the simulation one. The default is white parts and black motors, but you can modify the color by changing the "robot_color" part of the `env_config.json` file to either be "random" or a value like [0.1, 0.1, 0.1] for black colored robots.
 
@@ -68,23 +67,22 @@ Then place the camera approximately where it is in simulation relative to the ro
 Next you can run the next script which will help you align the camera a bit. It will open a live window that overlays the simulation rendered image on top of the real world image. Your goal is to move and nudge the real world camera's position and orientation until you see the simulation and real world image overlay line up. Some cameras also have different intrinsics/fovs, while running this script you can also tune the field of view (FOV) value by pressing the left and right keys. This stage doesn't have to be perfectly done as we leverage domain randomization during RL training to support larger margins of error, but the closer the alignment the better. This is the hardest part of the tutorial and does take a little bit of practice. One recommendation to help make this easier is to first get a sense of how translation and rotation in the x, y, z axes of the real camera affect the overlay image and to slowly move in each direction one by one.
 
 ```bash
-python lerobot_sim2real/scripts/camera_alignment.py --env-id="SO100GraspCube-v1" --env-kwargs-json-path=env_config.json
+python lerobot_sim2real/scripts/camera_alignment.py --env-id="SO101GraspCube-v1" --env-kwargs-json-path=env_config.json
 ```
 
-Two examples are shown below, both of which after RL training worked out fine and produced working real world deployable models. Note that there are obvious errors here but that's fine! 
+Two examples are shown below, both of which after RL training worked out fine and produced working real world deployable models. Note that there are obvious errors here but that's fine!
 
 > [!NOTE]
 > Based on testing from the community, alignment that looks worse than the ones here will struggle a lot more to work during sim2real transfer. We recommend using a camera stand with multiple degrees of freedom in different axes and using your hand to slowly move the camera around until it lines up well. This does take some practice but once you get the hang of it it becomes much easier to do. It is possible to permit even more calibration error but will require more advanced techniques and modifications to training that we leave as open research problems.
 
 ![](./assets/camera_alignment_step_1.2.png)
 
-
-## 1.3: Get an image for greenscreening to bridge the sim2real visual gap 
+## 1.3: Get an image for greenscreening to bridge the sim2real visual gap
 
 Once the camera looks well aligned, you need to take the robot off the surface/table and then take a picture of the background using the following script. It will save to a file `greenscreen.png`. If you can't unmount the robot, you can take the picture anyway and use photo editing tools or AI to remove the robot and inpaint the background.
 
 ```bash
-python lerobot_sim2real/scripts/capture_background_image.py --env-id="SO100GraspCube-v1" --env-kwargs-json-path=env_config.json --out=greenscreen.png
+python lerobot_sim2real/scripts/capture_background_image.py --env-id="SO101GraspCube-v1" --env-kwargs-json-path=env_config.json --out=greenscreen.png
 ```
 
 Note that we still use the simulation environment here but primarily to determine how to crop the background image. If the sim camera resolution is 128x128 (the default) we crop the greenscreen image down to 128x128. Once the greenscreen.png file is saved, modify "greenscreen_overlay_path" key in the env_config.json file to include the path to that file.
@@ -92,32 +90,31 @@ Note that we still use the simulation environment here but primarily to determin
 After capturing a greenscreen image mount the robot back to where it was originally. If you want to double check you can run the camera alignment script with the green screen image supplied and nudge the real robot mount location until it lines up. Simply run the camera alignment script again after updating the "greenscreen_overlay_path" key in env_config.json.
 
 ```bash
-python lerobot_sim2real/scripts/camera_alignment.py --env-id="SO100GraspCube-v1" --env-kwargs-json-path=env_config.json
+python lerobot_sim2real/scripts/camera_alignment.py --env-id="SO101GraspCube-v1" --env-kwargs-json-path=env_config.json
 ```
 
 This will then produce something like below. Again it is not perfect alignment but this can still work!
 
 ![](./assets/camera_alignment_step_1.3.png)
 
-
 ## 2: Visual Reinforcement Learning in Simulation
 
 Now we get to train the robot we setup in the real world in simulation via RL. We provide a baseline training script for visual Proximal Policy Optimization (PPO), which accepts environment id and the env configuration json file so that we can train on an environment aligned with the real world. If you haven't already make sure to add the path to the greenscreen image in your env_config.json file.
 
-For the SO100GraspCube-v1 environment we have the following already tuned script (uses about 8-10GB of GPU memory)
+For the SO101GraspCube-v1 environment we have the following already tuned script (uses about 8-10GB of GPU memory)
 
 ```bash
 seed=3
-python lerobot_sim2real/scripts/train_ppo_rgb.py --env-id="SO100GraspCube-v1" --env-kwargs-json-path=env_config.json \
+python lerobot_sim2real/scripts/train_ppo_rgb.py --env-id="SO101GraspCube-v1" --env-kwargs-json-path=env_config.json \
   --ppo.seed=${seed} \
   --ppo.num_envs=1024 --ppo.num-steps=16 --ppo.update_epochs=8 --ppo.num_minibatches=32 \
   --ppo.total_timesteps=100_000_000 --ppo.gamma=0.9 \
   --ppo.num_eval_envs=16 --ppo.num-eval-steps=64 --ppo.no-partial-reset \
-  --ppo.exp-name="ppo-SO100GraspCube-v1-rgb-${seed}" \
+  --ppo.exp-name="ppo-SO101GraspCube-v1-rgb-${seed}" \
   --ppo.track --ppo.wandb_project_name "SO100-ManiSkill"
 ```
 
-This will train an agent via RL/PPO and track its training progress on Weights and Biases and Tensorboard. Run `tensorboard --logdir runs/` to see the local tracking. Checkpoints are saved to `runs/ppo-SO100GraspCube-v1-rgb-${seed}/ckpt_x.pt` and evaluation videos in simulation are saved to `runs/ppo-SO100GraspCube-v1-rgb-${seed}/videos`. If you have more GPU memory available you can train faster by bumping the `--ppo.num_envs` argument up to 2048.
+This will train an agent via RL/PPO and track its training progress on Weights and Biases and Tensorboard. Run `tensorboard --logdir runs/` to see the local tracking. Checkpoints are saved to `runs/ppo-SO101GraspCube-v1-rgb-${seed}/ckpt_x.pt` and evaluation videos in simulation are saved to `runs/ppo-SO101GraspCube-v1-rgb-${seed}/videos`. If you have more GPU memory available you can train faster by bumping the `--ppo.num_envs` argument up to 2048.
 
 While training you can check out the eval videos which by default look like the following 4x4 grid showing 16 parallel environments:
 
@@ -129,8 +126,7 @@ Moreover, for this environment the evaluation result curves may look approximate
 
 ![](./assets/eval_return_success_curves.png)
 
-For the SO100GraspCube-v1 task you don't need 100_000_000 timesteps of training for successful deployment. We find that around 25 to 40 million are enough, which take about an hour of training on a 4090 GPU. Over training can sometimes lead to worse policies! Generally make sure first your policy reaches a high evaluation success rate in simulation before considering taking a checkpoint and deploying it.
-
+For the SO101GraspCube-v1 task you don't need 100_000_000 timesteps of training for successful deployment. We find that around 25 to 40 million are enough, which take about an hour of training on a 4090 GPU. Over training can sometimes lead to worse policies! Generally make sure first your policy reaches a high evaluation success rate in simulation before considering taking a checkpoint and deploying it.
 
 ## 3: Real World Deployment
 
@@ -139,7 +135,7 @@ Now you have a checkpoint you have trained and want to evaluate, place a cube on
 Then you run your model on the real robot with the following. Note that each time the real environment needs to be reset you will be prompted in the terminal to do so and to press enter to start the next evaluation episode.
 
 ```bash
-python lerobot_sim2real/scripts/eval_ppo_rgb.py --env_id="SO100GraspCube-v1" --env-kwargs-json-path=env_config.json \
+python lerobot_sim2real/scripts/eval_ppo_rgb.py --env_id="SO101GraspCube-v1" --env-kwargs-json-path=env_config.json \
     --checkpoint=path/to/ckpt.pt --no-continuous-eval --control-freq=15
 ```
 
