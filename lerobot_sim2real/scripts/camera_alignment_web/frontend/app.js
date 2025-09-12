@@ -1,8 +1,14 @@
 class CameraAlignmentApp {
     constructor() {
         this.ws = null;
-        this.canvas = document.getElementById('cameraCanvas');
-        this.ctx = this.canvas.getContext('2d');
+        // Three canvas elements
+        this.overlayCanvas = document.getElementById('overlayCanvas');
+        this.overlayCtx = this.overlayCanvas.getContext('2d');
+        this.simCanvas = document.getElementById('simCanvas');
+        this.simCtx = this.simCanvas.getContext('2d');
+        this.cameraCanvas = document.getElementById('cameraCanvas');
+        this.cameraCtx = this.cameraCanvas.getContext('2d');
+        
         this.connectionStatus = document.getElementById('connectionStatus');
         this.frameCount = document.getElementById('frameCount');
         this.loadingOverlay = document.getElementById('loadingOverlay');
@@ -14,9 +20,20 @@ class CameraAlignmentApp {
         this.posZ = document.getElementById('posZ');
         this.fov = document.getElementById('fov');
         
+        // Display toggles
+        this.showCameraToggle = document.getElementById('showCameraToggle');
+        this.showSimToggle = document.getElementById('showSimToggle');
+        this.overlayOpacity = document.getElementById('overlayOpacity');
+        this.opacityValue = document.getElementById('opacityValue');
+        
         // Control state
         this.activeControls = new Set();
         this.isConnected = false;
+        this.displaySettings = {
+            showCamera: true,
+            showSim: true,
+            opacity: 0.5
+        };
         
         // Initialize
         this.init();
@@ -73,8 +90,8 @@ class CameraAlignmentApp {
     
     handleMessage(data) {
         switch (data.type) {
-            case 'frame':
-                this.updateFrame(data.frame);
+            case 'frames':
+                this.updateFrames(data);
                 this.updateState(data.state);
                 break;
             case 'config':
@@ -86,15 +103,32 @@ class CameraAlignmentApp {
         }
     }
     
-    updateFrame(frameData) {
+    updateFrames(data) {
+        // Update overlay canvas
+        if (data.overlayFrame) {
+            this.updateCanvas(this.overlayCanvas, this.overlayCtx, data.overlayFrame);
+        }
+        
+        // Update sim canvas
+        if (data.simFrame) {
+            this.updateCanvas(this.simCanvas, this.simCtx, data.simFrame);
+        }
+        
+        // Update camera canvas
+        if (data.cameraFrame) {
+            this.updateCanvas(this.cameraCanvas, this.cameraCtx, data.cameraFrame);
+        }
+    }
+    
+    updateCanvas(canvas, ctx, frameData) {
         const img = new Image();
         img.onload = () => {
             // Resize canvas to match image
-            if (this.canvas.width !== img.width || this.canvas.height !== img.height) {
-                this.canvas.width = img.width;
-                this.canvas.height = img.height;
+            if (canvas.width !== img.width || canvas.height !== img.height) {
+                canvas.width = img.width;
+                canvas.height = img.height;
             }
-            this.ctx.drawImage(img, 0, 0);
+            ctx.drawImage(img, 0, 0);
         };
         img.src = 'data:image/jpeg;base64,' + frameData;
     }
@@ -169,6 +203,24 @@ class CameraAlignmentApp {
         const saveBtn = document.getElementById('saveConfigBtn');
         saveBtn.addEventListener('click', () => {
             this.saveConfiguration();
+        });
+        
+        // Display toggles
+        this.showCameraToggle.addEventListener('change', () => {
+            this.displaySettings.showCamera = this.showCameraToggle.checked;
+            this.sendDisplaySettings();
+        });
+        
+        this.showSimToggle.addEventListener('change', () => {
+            this.displaySettings.showSim = this.showSimToggle.checked;
+            this.sendDisplaySettings();
+        });
+        
+        // Opacity slider
+        this.overlayOpacity.addEventListener('input', () => {
+            this.displaySettings.opacity = this.overlayOpacity.value / 100;
+            this.opacityValue.textContent = `${this.overlayOpacity.value}%`;
+            this.sendDisplaySettings();
         });
     }
     
@@ -299,6 +351,15 @@ class CameraAlignmentApp {
         setTimeout(() => {
             this.notification.classList.remove('show');
         }, 3000);
+    }
+    
+    sendDisplaySettings() {
+        if (!this.isConnected) return;
+        
+        this.sendMessage({
+            type: 'display_settings',
+            settings: this.displaySettings
+        });
     }
 }
 

@@ -22,7 +22,20 @@
         <main>
             <div class="content-wrapper">
                 <div class="camera-view">
-                    <canvas id="cameraCanvas"></canvas>
+                    <div class="canvas-container">
+                        <div class="canvas-wrapper">
+                            <canvas id="overlayCanvas"></canvas>
+                            <label class="canvas-label">Overlay</label>
+                        </div>
+                        <div class="canvas-wrapper">
+                            <canvas id="simCanvas"></canvas>
+                            <label class="canvas-label">Simulation</label>
+                        </div>
+                        <div class="canvas-wrapper">
+                            <canvas id="cameraCanvas"></canvas>
+                            <label class="canvas-label">Camera</label>
+                        </div>
+                    </div>
                     <div class="loading-overlay" id="loadingOverlay">
                         <div class="spinner"></div>
                         <p>Connecting to camera...</p>
@@ -97,6 +110,25 @@
                             <button class="control-btn" data-control="fov_increase" title="Increase FOV (.)">
                                 + Increase
                             </button>
+                        </div>
+                    </section>
+
+                    <section class="control-section">
+                        <h2>Display Options</h2>
+                        <div class="toggle-controls">
+                            <label class="toggle-item">
+                                <input type="checkbox" id="showCameraToggle" checked>
+                                <span>Show Camera</span>
+                            </label>
+                            <label class="toggle-item">
+                                <input type="checkbox" id="showSimToggle" checked>
+                                <span>Show Simulation</span>
+                            </label>
+                            <div class="opacity-control">
+                                <label for="overlayOpacity">Overlay Opacity:</label>
+                                <input type="range" id="overlayOpacity" min="0" max="100" value="50">
+                                <span id="opacityValue">50%</span>
+                            </div>
                         </div>
                     </section>
 

@@ -60,6 +60,11 @@ class CameraAlignmentServer:
         self.output_dir = "camera_alignment_output"
         self.frame_count = 0
         
+        # Display settings
+        self.show_camera = True
+        self.show_sim = True
+        self.overlay_opacity = 0.5
+        
         # Movement settings
         self.MOVEMENT_STEP = 0.01
         self.FOV_STEP = 0.01
@@ -109,7 +114,12 @@ class CameraAlignmentServer:
         self.running = True
     
     def overlay_envs(self):
-        """Overlay simulation observations onto real observations"""
+        """Overlay simulation observations onto real observations based on display settings"""
+        if not self.show_camera and not self.show_sim:
+            # Return a blank image if both are disabled
+            blank_img = torch.zeros((512, 512, 3), dtype=torch.float32)
+            return blank_img
+        
         real_obs = self.real_env.get_obs()["sensor_data"]
         sim_obs = self.sim_env.get_obs()["sensor_data"]
         
@@ -118,10 +128,22 @@ class CameraAlignmentServer:
         
         overlaid_dict = self.sim_env.get_obs()["sensor_data"]
         overlaid_imgs = []
+        
         for name in overlaid_dict:
             real_imgs = real_obs[name]["rgb"][0] / 255
             sim_imgs = overlaid_dict[name]["rgb"][0].cpu() / 255
-            overlaid_imgs.append(0.5 * real_imgs + 0.5 * sim_imgs)
+            
+            if self.show_camera and self.show_sim:
+                # Blend both based on opacity
+                overlaid_img = (1 - self.overlay_opacity) * real_imgs + self.overlay_opacity * sim_imgs
+            elif self.show_camera:
+                # Show only camera
+                overlaid_img = real_imgs
+            elif self.show_sim:
+                # Show only simulation
+                overlaid_img = sim_imgs
+            
+            overlaid_imgs.append(overlaid_img)
         
         return tile_images(overlaid_imgs)
     
@@ -160,6 +182,12 @@ class CameraAlignmentServer:
             self.sim_env.unwrapped.base_camera_settings["fov"] + self.fov_offset
         )
     
+    def update_display_settings(self, settings: Dict):
+        """Update display settings for camera/sim toggles and opacity"""
+        self.show_camera = settings.get("showCamera", True)
+        self.show_sim = settings.get("showSim", True)
+        self.overlay_opacity = settings.get("opacity", 0.5)
+    
     def save_camera_config(self):
         """Save camera configuration to JSON file"""
         config = CameraConfig(
@@ -181,33 +209,69 @@ class CameraAlignmentServer:
             return CameraConfig(**config_data)
         return None
     
-    def get_current_frame(self) -> str:
-        """Get the current overlay frame as base64 encoded JPEG"""
+    def get_current_frames(self) -> Dict[str, str]:
+        """Get all three frames: overlay, sim-only, and camera-only as base64 encoded JPEGs"""
         if not self.is_initialized:
-            return None
+            return {"overlayFrame": None, "simFrame": None, "cameraFrame": None}
         
-        overlaid_imgs = self.overlay_envs()
+        # Get raw observations
+        real_obs = self.real_env.get_obs()["sensor_data"]
+        sim_obs = self.sim_env.get_obs()["sensor_data"]
         
-        # Convert tensor to numpy array if needed
-        if isinstance(overlaid_imgs, torch.Tensor):
-            overlaid_imgs = overlaid_imgs.cpu().numpy()
+        frames = {}
         
-        # Convert to BGR for OpenCV
-        if overlaid_imgs.dtype != np.uint8:
-            overlaid_imgs = (overlaid_imgs * 255).astype(np.uint8)
-        overlaid_imgs_bgr = cv2.cvtColor(overlaid_imgs, cv2.COLOR_RGB2BGR)
-        
-        # Save to disk
-        output_path = os.path.join(self.output_dir, "camera_alignment.jpg")
-        cv2.imwrite(output_path, overlaid_imgs_bgr)
-        
-        # Encode as JPEG for web transmission
-        _, buffer = cv2.imencode('.jpg', overlaid_imgs_bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
-        jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+        # Process each camera view
+        for name in real_obs:
+            real_imgs = real_obs[name]["rgb"][0] / 255
+            sim_imgs = sim_obs[name]["rgb"][0].cpu() / 255
+            
+            # Create overlay frame
+            overlaid_img = (1 - self.overlay_opacity) * real_imgs + self.overlay_opacity * sim_imgs
+            
+            # Convert and encode overlay frame
+            overlaid_tensor = tile_images([overlaid_img])
+            if isinstance(overlaid_tensor, torch.Tensor):
+                overlaid_np = overlaid_tensor.cpu().numpy()
+            else:
+                overlaid_np = overlaid_tensor
+            if overlaid_np.dtype != np.uint8:
+                overlaid_np = (overlaid_np * 255).astype(np.uint8)
+            overlaid_bgr = cv2.cvtColor(overlaid_np, cv2.COLOR_RGB2BGR)
+            _, overlay_buffer = cv2.imencode('.jpg', overlaid_bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            frames["overlayFrame"] = base64.b64encode(overlay_buffer).decode('utf-8')
+            
+            # Convert and encode sim-only frame
+            sim_tensor = tile_images([sim_imgs])
+            if isinstance(sim_tensor, torch.Tensor):
+                sim_np = sim_tensor.cpu().numpy()
+            else:
+                sim_np = sim_tensor
+            if sim_np.dtype != np.uint8:
+                sim_np = (sim_np * 255).astype(np.uint8)
+            sim_bgr = cv2.cvtColor(sim_np, cv2.COLOR_RGB2BGR)
+            _, sim_buffer = cv2.imencode('.jpg', sim_bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            frames["simFrame"] = base64.b64encode(sim_buffer).decode('utf-8')
+            
+            # Convert and encode camera-only frame
+            camera_tensor = tile_images([real_imgs])
+            if isinstance(camera_tensor, torch.Tensor):
+                camera_np = camera_tensor.cpu().numpy()
+            else:
+                camera_np = camera_tensor
+            if camera_np.dtype != np.uint8:
+                camera_np = (camera_np * 255).astype(np.uint8)
+            camera_bgr = cv2.cvtColor(camera_np, cv2.COLOR_RGB2BGR)
+            _, camera_buffer = cv2.imencode('.jpg', camera_bgr, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            frames["cameraFrame"] = base64.b64encode(camera_buffer).decode('utf-8')
+            
+            # Save overlay to disk for reference
+            output_path = os.path.join(self.output_dir, "camera_alignment.jpg")
+            cv2.imwrite(output_path, overlaid_bgr)
+            
+            break  # Process only the first camera for now
         
         self.frame_count += 1
-        
-        return jpg_as_text
+        return frames
     
     def get_state(self) -> SimulationState:
         """Get current simulation state"""
@@ -262,6 +326,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 if data["type"] == "controls":
                     server.update_camera(data["controls"])
+                elif data["type"] == "display_settings":
+                    server.update_display_settings(data["settings"])
                 elif data["type"] == "save_config":
                     config = server.save_camera_config()
                     await websocket.send_json({
@@ -278,14 +344,14 @@ async def websocket_endpoint(websocket: WebSocket):
             except asyncio.TimeoutError:
                 pass
             
-            # Send current frame and state
-            frame = server.get_current_frame()
+            # Send current frames and state
+            frames = server.get_current_frames()
             state = server.get_state()
             
-            if frame:
+            if frames["overlayFrame"]:
                 await websocket.send_json({
-                    "type": "frame",
-                    "frame": frame,
+                    "type": "frames",
+                    **frames,
                     "state": asdict(state)
                 })
             
