@@ -61,7 +61,14 @@ To see how the model training is progress you can view the eval result videos in
 Before runnign on real hardware you can evalate your trained PPO policy in the sim. Videos of the evals will be saved to `evaluation_videos`
 
 ```bash
-python lerobot_sim2real/scripts/eval_ppo_sim.py     --checkpoint runs/ppo-SO100GraspCube-v1-rgb-3/ckpt_2826.pt     --env-id SO100GraspCube-v1     --num-episodes 10
+python lerobot_sim2real/scripts/eval_ppo_sim.py --env-kwargs-json-path=env_config.json --checkpoint runs/gandalf-so101graspcube-43/final_ckpt.pt     --env-id SO101GraspCube-v1     --num-episodes 10
+```
+
+### Eval On Robot
+
+```bash
+python lerobot_sim2real/scripts/eval_ppo_rgb.py --env_id="SO101GraspCube-v1" --env-kwargs-json-path=env_config.json \
+    --checkpoint=runs/gandalf-so101graspcube-43/ckpt_2076.pt --control-freq=15
 ```
 
 ## Check Your Nvidia and CUDA Setup
